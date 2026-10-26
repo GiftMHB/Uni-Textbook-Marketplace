@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Feature Crossword</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .wrap {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .back {
+            display: inline-block;
+            margin-bottom: 8px;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .level {
+            display: inline-block;
+            background: var(--primary);
+            color: var(--primary-foreground);
+            font-weight: 700;
+            font-size: .8rem;
+            padding: 4px 14px;
+            border-radius: 9999px;
+            margin-bottom: 8px;
+        }
+
+        .scroll {
+            overflow-x: auto;
+            padding: 8px 0;
+        }
+
+        #grid {
+            display: grid;
+            gap: 2px;
+            justify-content: center;
+        }
+
+        .cell {
+            position: relative;
+            width: 34px;
+            height: 34px;
+        }
+
+        .cell input {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            text-align: center;
+            text-transform: uppercase;
+            font: 700 1.1rem 'Montserrat', sans-serif;
+            color: var(--foreground);
+            background: var(--card);
+            border: 2px solid var(--primary);
+            border-radius: 4px;
+        }
+
+        .cell input:focus {
+            outline: 3px solid rgba(0, 180, 216, .35);
+        }
+
+        .cell input.ok {
+            background: #155E2E;
+            color: #fff;
+            border-color: #155E2E;
+        }
+
+        .cell input.bad {
+            background: #b91c1c;
+            color: #fff;
+            border-color: #b91c1c;
+        }
+
+        .cell span {
+            position: absolute;
+            top: 1px;
+            left: 3px;
+            font-size: 9px;
+            font-weight: 700;
+            color: var(--dark-cyan);
+            pointer-events: none;
+        }
+
+        .now {
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            background: var(--primary);
+            color: var(--primary-foreground);
+            font-weight: 600;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin: 8px 0 14px;
+            text-align: left;
+        }
+
+        .layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: flex-start;
+            justify-content: center;
+        }
+
+        .left {
+            flex: 1 1 420px;
+            min-width: 0;
+        }
+
+        .clues {
+            flex: 1 1 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            text-align: left;
+        }
+
+        .clues p {
+            margin: 6px 0;
+            cursor: pointer;
+            font-size: .9rem;
+        }
+
+        .clues p:hover {
+            color: var(--primary);
+        }
+
+        #msg {
+            font-size: 1.2rem;
+            font-weight: 700;
+            min-height: 32px;
+            margin: 12px 0 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <a class="back" href="index.html">← Home</a>
+        <h2>🧩 Feature Crossword</h2>
+        <div class="level" id="lvl"></div>
+
+        <!-- Always-visible bar: shows the clue for the box you are typing in -->
+        <div class="now" id="now">👆 Tap a box to see its clue</div>
+
+        <div class="layout">
+            <div class="left">
+                <div class="scroll">
+                    <div id="grid"></div>
+                </div>
+                <div id="msg"></div>
+                <button class="btn-primary" id="check">✔ Check Answers</button>
+                <button class="btn-primary" id="next" style="display:none"></button>
+            </div>
+
+            <!-- Full clue lists, next to the grid on wide screens -->
+            <div class="clues">
+                <div class="card">
+                    <h2>Across</h2>
+                    <div id="ac"></div>
+                </div>
+                <div class="card">
+                    <h2>Down</h2>
+                    <div id="dn"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const LEVELS = [
+            [ // ---- LEVEL 1 ----
+                { w: "AUCTIONS", c: "What a seller turns an approved listing into when they want buyers to bid on it" },
+                { w: "WISHLIST", c: "Where a listing ends up after a buyer taps the heart on it" },
+                { w: "MESSAGING", c: "How a buyer and seller chat privately inside the app after a listing catches their eye" },
+                { w: "SEARCH", c: "What a student does by typing a title, module or faculty when they want to find a book" },
+                { w: "REPORT", c: "What a student submits after spotting a suspicious listing, so admins can look into it" }
+            ],
+            [ // ---- LEVEL 2 ----
+                { w: "NOTIFICATIONS", c: "What a student finds under the bell icon after an admin approves their listing or they win an auction" },
+                { w: "OPTIMIZER", c: "Bundle ______: the tool students open after picking all their modules, to get the cheapest mix of sellers with the fewest meetups" },
+                { w: "MODERATE", c: "Where an admin goes after a seller submits a new listing, to approve or reject it" },
+                { w: "APPEALS", c: "What a suspended student writes after seeing the ban screen, so an admin can reconsider" },
+                { w: "VERIFIED", c: "What every user becomes after entering the OTP code sent to their university email (_______ student)" }
+            ]
+        ];
+
+        const PRIZES = ["🍫 Chocolate", "🏆 Mystery prize"];
+
+        const $ = id => document.getElementById(id);
+        const K = (r, c) => r + "," + c;                
+        let g, info, placed, answers, where, boxes, dir, level = 0;
+
+        // Can word w start at row r, column c, going across (d=0) or down (d=1)?
+        function fits(w, r, c, d) {
+            const dr = d, dc = 1 - d; let crossings = 0;
+            if (g.has(K(r - dr, c - dc)) || g.has(K(r + dr * w.length, c + dc * w.length))) return false;
+            for (let i = 0; i < w.length; i++) {
+                const rr = r + dr * i, cc = c + dc * i, existing = g.get(K(rr, cc));
+                if (existing) {
+                    if (existing !== w[i] || info.get(K(rr, cc))[d] !== undefined) return false;
+                    crossings++;
+                } else if (g.has(K(rr + dc, cc + dr)) || g.has(K(rr - dc, cc - dr))) return false;
+            }
+            return crossings > 0;
+        }
+        function put(item, r, c, d) {
+            const word = { ...item, clue: item.c, r, c, d };   // keep the clue text safe (c becomes the column)
+            placed.push(word);
+            for (let i = 0; i < item.w.length; i++) {
+                const k = K(r + d * i, c + (1 - d) * i);
+                g.set(k, item.w[i]);
+                const o = info.get(k) || {}; o[d] = word; info.set(k, o);
+            }
+        }
+        function showClue(k) {                          // fill the top bar with this box's clue
+            const p = where.get(k)[dir];
+            $("now").textContent = p.n + " " + (p.d ? "Down" : "Across") + ": " + p.clue + " (" + p.w.length + ")";
+        }
+        function move(r, c, step) {                      // jump to next/previous box
+            const next = dir ? K(r + step, c) : K(r, c + step);
+            if (boxes.has(next)) boxes.get(next).focus();
+        }
+
+        /* ===== PART 4: LOAD A LEVEL =====
+           Clears the old board, builds the new one. */
+        function load(i) {
+            level = i;
+            g = new Map(); info = new Map(); placed = []; answers = new Map(); where = new Map(); boxes = new Map(); dir = 0;
+            $("grid").innerHTML = ""; $("ac").innerHTML = ""; $("dn").innerHTML = ""; $("msg").textContent = "";
+            $("now").textContent = "👆 Tap a box to see its clue";
+            $("next").style.display = "none"; $("check").style.display = "inline-flex";
+            $("lvl").textContent = "Level " + (i + 1) + " of " + LEVELS.length;
+
+            // Place the longest word first, then cross the others through shared letters
+            [...LEVELS[i]].sort((a, b) => b.w.length - a.w.length).forEach((it, n) => {
+                if (n === 0) return put(it, 0, 0, 0);
+                for (let d = 0; d < 2; d++) for (let j = 0; j < it.w.length; j++) for (const [k, ch] of [...g]) {
+                    if (ch !== it.w[j]) continue;
+                    const [cr, cc] = k.split(",").map(Number);
+                    const r = cr - d * j, c = cc - (1 - d) * j;
+                    if (fits(it.w, r, c, d)) { put(it, r, c, d); return; }
+                }
+                console.warn("Could not place:", it.w);
+            });
+
+            // Work out the board size and move everything to the top-left
+            const pts = [...g.keys()].map(k => k.split(",").map(Number));
+            const minR = Math.min(...pts.map(p => p[0])), minC = Math.min(...pts.map(p => p[1]));
+            const rows = Math.max(...pts.map(p => p[0])) - minR + 1, cols = Math.max(...pts.map(p => p[1])) - minC + 1;
+            placed.forEach(p => { p.r -= minR; p.c -= minC; });
+            g.forEach((v, k) => { const [r, c] = k.split(",").map(Number); answers.set(K(r - minR, c - minC), v); where.set(K(r - minR, c - minC), info.get(k)); });
+
+            // Number the start of each word (1, 2, 3...)
+            const numbers = new Map(); let n = 0;
+            [...placed].sort((a, b) => a.r - b.r || a.c - b.c).forEach(p => {
+                const k = K(p.r, p.c); if (!numbers.has(k)) numbers.set(k, ++n); p.n = numbers.get(k);
+            });
+
+            // Draw the boxes
+            $("grid").style.gridTemplateColumns = "repeat(" + cols + ", 34px)";
+            for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+                const k = K(r, c), cell = document.createElement("div"); cell.className = "cell";
+                if (answers.has(k)) {
+                    const input = document.createElement("input"); input.maxLength = 1; input.autocomplete = "off";
+                    if (numbers.has(k)) { const s = document.createElement("span"); s.textContent = numbers.get(k); cell.appendChild(s); }
+                    input.onfocus = () => { if (where.get(k)[dir] === undefined) dir = 1 - dir; showClue(k); };
+                    input.onclick = () => { const o = where.get(k); if (o[0] !== undefined && o[1] !== undefined) dir = 1 - dir; showClue(k); };
+                    input.oninput = () => { input.className = ""; input.value = input.value.toUpperCase(); if (input.value) move(r, c, 1); };
+                    input.onkeydown = e => { if (e.key === "Backspace" && !input.value) move(r, c, -1); };
+                    cell.appendChild(input); boxes.set(k, input);
+                }
+                $("grid").appendChild(cell);
+            }
+
+            // Write the clue lists
+            placed.sort((a, b) => a.n - b.n).forEach(p => {
+                const line = document.createElement("p");
+                line.textContent = p.n + ". " + p.clue + " (" + p.w.length + ")";
+                line.onclick = () => { dir = p.d; boxes.get(K(p.r, p.c)).focus(); };
+                $(p.d ? "dn" : "ac").appendChild(line);
+            });
+        }
+
+        /* ===== PART 5: CHECK ANSWERS =====
+           Level done -> offer the next level. Last level done -> prize! */
+        $("check").onclick = () => {
+            let wrong = 0, empty = 0;
+            boxes.forEach((input, k) => {
+                if (!input.value) { empty++; input.className = ""; return; }
+                const right = input.value === answers.get(k);
+                input.className = right ? "ok" : "bad"; if (!right) wrong++;
+            });
+            if (wrong) return $("msg").textContent = "❌ " + wrong + " wrong. Keep trying!";
+            if (empty) return $("msg").textContent = "Keep going, " + empty + " boxes left!";
+
+            const last = level === LEVELS.length - 1;
+            $("check").style.display = "none";
+            $("next").style.display = "inline-flex";
+            if (last) {
+                $("msg").textContent = "🏆 All levels done! Prize: " + PRIZES[Math.floor(Math.random() * PRIZES.length)];
+                $("next").textContent = "↻ Play Again";
+            } else {
+                $("msg").textContent = "🎉 Level " + (level + 1) + " complete!";
+                $("next").textContent = "Next Level ▶";
+            }
+        };
+        $("next").onclick = () => load(level + 1 < LEVELS.length ? level + 1 : 0);
+
+        load(0);   // start on Level 1
+    </script>
+</body>
+
+</html>
