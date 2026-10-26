@@ -47,8 +47,8 @@
 
         .cell {
             position: relative;
-            width: 34px;
-            height: 34px;
+            width: var(--cell, 34px);
+            height: var(--cell, 34px);
         }
 
         .cell input {
@@ -57,7 +57,7 @@
             padding: 0;
             text-align: center;
             text-transform: uppercase;
-            font: 700 1.1rem 'Montserrat', sans-serif;
+            font: 700 calc(var(--cell, 34px) * 0.55) 'Montserrat', sans-serif;
             color: var(--foreground);
             background: var(--card);
             border: 2px solid var(--primary);
@@ -83,8 +83,8 @@
         .cell span {
             position: absolute;
             top: 1px;
-            left: 3px;
-            font-size: 9px;
+            left: 2px;
+            font-size: max(7px, calc(var(--cell, 34px) * 0.27));
             font-weight: 700;
             color: var(--dark-cyan);
             pointer-events: none;
@@ -112,7 +112,7 @@
         }
 
         .left {
-            flex: 1 1 420px;
+            flex: 1 1 460px;
             min-width: 0;
         }
 
@@ -132,6 +132,12 @@
 
         .clues p:hover {
             color: var(--primary);
+        }
+
+        @media (max-width: 600px) {
+            .wrap {
+                padding: 12px;
+            }
         }
 
         #msg {
@@ -177,6 +183,7 @@
     </div>
 
     <script>
+        
         const LEVELS = [
             [ // ---- LEVEL 1 ----
                 { w: "AUCTIONS", c: "What a seller turns an approved listing into when they want buyers to bid on it" },
@@ -194,13 +201,12 @@
             ]
         ];
 
-        const PRIZES = ["🍫 Chocolate", "🏆 Mystery prize"];
+        const PRIZES = ["🍫 Chocolate", "🎁 Mystery prize"];
 
         const $ = id => document.getElementById(id);
-        const K = (r, c) => r + "," + c;                
-        let g, info, placed, answers, where, boxes, dir, level = 0;
+        const K = (r, c) => r + "," + c;              
+        let g, info, placed, answers, where, boxes, dir, level = 0, curCols = 1;
 
-        // Can word w start at row r, column c, going across (d=0) or down (d=1)?
         function fits(w, r, c, d) {
             const dr = d, dc = 1 - d; let crossings = 0;
             if (g.has(K(r - dr, c - dc)) || g.has(K(r + dr * w.length, c + dc * w.length))) return false;
@@ -214,25 +220,29 @@
             return crossings > 0;
         }
         function put(item, r, c, d) {
-            const word = { ...item, clue: item.c, r, c, d };   // keep the clue text safe (c becomes the column)
-            placed.push(word);
+            const word = { ...item, clue: item.c, r, c, d };   
             for (let i = 0; i < item.w.length; i++) {
                 const k = K(r + d * i, c + (1 - d) * i);
                 g.set(k, item.w[i]);
                 const o = info.get(k) || {}; o[d] = word; info.set(k, o);
             }
         }
-        function showClue(k) {                          // fill the top bar with this box's clue
+        function fitGrid() {                            
+            const room = $("grid").parentElement.clientWidth;          
+            const size = Math.max(18, Math.min(34, Math.floor((room - 2 * (curCols - 1)) / curCols)));
+            document.documentElement.style.setProperty("--cell", size + "px");
+        }
+        window.addEventListener("resize", fitGrid);      
+
+        function showClue(k) {                         
             const p = where.get(k)[dir];
             $("now").textContent = p.n + " " + (p.d ? "Down" : "Across") + ": " + p.clue + " (" + p.w.length + ")";
         }
-        function move(r, c, step) {                      // jump to next/previous box
+        function move(r, c, step) {                     
             const next = dir ? K(r + step, c) : K(r, c + step);
             if (boxes.has(next)) boxes.get(next).focus();
         }
 
-        /* ===== PART 4: LOAD A LEVEL =====
-           Clears the old board, builds the new one. */
         function load(i) {
             level = i;
             g = new Map(); info = new Map(); placed = []; answers = new Map(); where = new Map(); boxes = new Map(); dir = 0;
@@ -267,7 +277,9 @@
             });
 
             // Draw the boxes
-            $("grid").style.gridTemplateColumns = "repeat(" + cols + ", 34px)";
+            curCols = cols;
+            $("grid").style.gridTemplateColumns = "repeat(" + cols + ", var(--cell))";
+            fitGrid();
             for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
                 const k = K(r, c), cell = document.createElement("div"); cell.className = "cell";
                 if (answers.has(k)) {
@@ -291,8 +303,6 @@
             });
         }
 
-        /* ===== PART 5: CHECK ANSWERS =====
-           Level done -> offer the next level. Last level done -> prize! */
         $("check").onclick = () => {
             let wrong = 0, empty = 0;
             boxes.forEach((input, k) => {
@@ -316,7 +326,7 @@
         };
         $("next").onclick = () => load(level + 1 < LEVELS.length ? level + 1 : 0);
 
-        load(0);   // start on Level 1
+        load(0);   
     </script>
 </body>
 
