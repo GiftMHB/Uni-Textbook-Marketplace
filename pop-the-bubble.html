@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pop the Bubble</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .wrap {
+            max-width: 420px;
+            margin: 0 auto;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .back {
+            display: inline-block;
+            margin-bottom: 8px;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .level {
+            display: inline-block;
+            background: var(--primary);
+            color: var(--primary-foreground);
+            font-weight: 700;
+            font-size: .8rem;
+            padding: 4px 14px;
+            border-radius: 9999px;
+            margin-bottom: 8px;
+        }
+
+        .info {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        #q {
+            font-weight: 600;
+            min-height: 56px;
+            margin: 6px 0 10px;
+        }
+
+        canvas {
+            width: 100%;
+            display: block;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            touch-action: none;
+        }
+
+        #msg {
+            font-size: 1.2rem;
+            font-weight: 700;
+            min-height: 32px;
+            margin: 12px 0 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <a class="back" href="index.html">← Home</a>
+        <h2>🫧 Pop the Bubble</h2>
+        <div class="level" id="lvl"></div>
+
+        <div class="info"><span id="score"></span><span id="lives"></span></div>
+        <div id="q">Tap START, then pop the bubble with the correct answer!</div>
+        <canvas id="c" width="360" height="460"></canvas>
+        <div id="msg"></div>
+        <button class="btn-primary" id="go">▶ START</button>
+    </div>
+
+    <script>
+        /* ===== PART 1: YOUR QUESTIONS (edit these) =====
+           q = question, o = three answers, a = position of the correct answer (0, 1 or 2).
+           Keep answers SHORT so they fit inside a bubble.
+           speed = how fast the bubbles float up in this level. */
+        const LEVELS = [
+            {
+                speed: 1.1, questions: [       // ---- LEVEL 1: easy ----
+                    { q: "Which email can a University of Pretoria student register with?", o: ["@tuks.co.za", "@gmail.com", "@outlook.com"], a: 0 },
+                    { q: "What do you tap on a listing to save it to your wishlist?", o: ["Heart icon", "Star icon", "Bell icon"], a: 0 },
+                    { q: "How many steps does it take to create a listing?", o: ["3", "4", "5"], a: 1 },
+                    { q: "Who reviews your listing after you submit it?", o: ["An admin", "A buyer", "Another seller"], a: 0 },
+                    { q: "What do you mark a listing as once the handover is complete?", o: ["Sold", "Pending", "Rejected"], a: 0 }
+                ]
+            },
+            {
+                speed: 1.6, questions: [       // ---- LEVEL 2: harder and faster ----
+                    { q: "What happens when someone bids in the last moments of an auction?", o: ["Countdown extends", "Auction ends", "Bid is deleted"], a: 0 },
+                    { q: "Who wins an auction if the reserve price was met?", o: ["Highest bidder", "First bidder", "The seller"], a: 0 },
+                    { q: "What does the Bundle Optimizer try to reduce?", o: ["Meetups", "Photos", "Messages"], a: 0 },
+                    { q: "What does the AI scan read to fill in your book details?", o: ["Front cover", "Price tag", "Receipt"], a: 0 },
+                    { q: "What can a suspended student submit to get their ban reviewed?", o: ["An appeal", "A report", "A bid"], a: 0 }
+                ]
+            }
+        ];
+
+        /* ===== PART 2: PRIZES (edit these) ===== */
+        const PRIZES = ["🍫 Chocolate", "🎁 Mystery prize"];
+        const LIVES = 3;
+
+        /* ===== PART 3: GAME MEMORY ===== */
+        const $ = id => document.getElementById(id);
+        const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+        const css = name => getComputedStyle(document.documentElement).getPropertyValue(name);
+        let level = 0, qs = [], qi = 0, score = 0, lives = LIVES, bubbles = [], running = false;
+
+        function hud() {
+            $("score").textContent = "⭐ " + score + " / " + qs.length;
+            $("lives").textContent = "❤️".repeat(Math.max(lives, 0));
+        }
+
+        /* ===== PART 4: START A LEVEL ===== */
+        function begin(i) {
+            level = i;
+            qs = [...LEVELS[i].questions].sort(() => Math.random() - 0.5);   // shuffle the questions
+            qi = 0; score = 0; lives = LIVES; running = true;
+            $("lvl").textContent = "Level " + (i + 1) + " of " + LEVELS.length;
+            $("msg").textContent = ""; $("go").style.display = "none";
+            spawn(); loop();
+        }
+
+        // Put the current question's 3 answers at the bottom, in random lanes
+        function spawn() {
+            const Q = qs[qi];
+            $("q").textContent = Q.q;
+            const lanes = [60, 180, 300].sort(() => Math.random() - 0.5);
+            const speed = LEVELS[level].speed + score * 0.1;
+            bubbles = Q.o.map((text, i) => ({ text, x: lanes[i], y: H + 50 + i * 40, r: 50, v: speed, ok: i === Q.a, wobble: Math.random() * 6, dx: lanes[i] }));
+            hud();
+        }
+
+        /* ===== PART 5: ANIMATION LOOP (runs ~60 times a second) ===== */
+        function loop() {
+            if (!running) return;
+            ctx.clearRect(0, 0, W, H);
+            ctx.textAlign = "center"; ctx.font = "bold 13px Montserrat, sans-serif";
+            for (const b of bubbles) {
+                b.y -= b.v; b.wobble += 0.03;
+                b.dx = b.x + Math.sin(b.wobble) * 15;                  // gentle side-to-side
+                ctx.fillStyle = css("--card"); ctx.strokeStyle = css("--primary"); ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.arc(b.dx, b.y, b.r, 0, 7); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = css("--foreground");
+                const lines = wrap(b.text);
+                lines.forEach((ln, i) => ctx.fillText(ln, b.dx, b.y + 5 + (i - (lines.length - 1) / 2) * 16, 84));
+            }
+            // All bubbles floated away without a tap? Lose a life and ask again
+            if (bubbles.every(b => b.y < -60)) { loseLife(); if (!running) return; spawn(); }
+            requestAnimationFrame(loop);
+        }
+
+        // Split long answers over two lines so they fit in the bubble
+        function wrap(text) {
+            if (text.length <= 11 || !text.includes(" ")) return [text];
+            const words = text.split(" "); let best = [text], gap = 99;
+            for (let i = 1; i < words.length; i++) {
+                const a = words.slice(0, i).join(" "), b = words.slice(i).join(" ");
+                if (Math.abs(a.length - b.length) < gap) { gap = Math.abs(a.length - b.length); best = [a, b]; }
+            }
+            return best;
+        }
+
+        /* ===== PART 6: TAPPING A BUBBLE ===== */
+        cv.addEventListener("pointerdown", e => {
+            if (!running) return;
+            const r = cv.getBoundingClientRect();
+            const px = (e.clientX - r.left) * W / r.width, py = (e.clientY - r.top) * H / r.height;
+            const hit = bubbles.find(b => Math.hypot(px - b.dx, py - b.y) < b.r);
+            if (!hit) return;
+            if (hit.ok) {
+                score++; qi++;
+                if (qi >= qs.length) return levelDone();
+                spawn();
+            } else {
+                loseLife(); if (running) spawn();       // wrong tap: lose a life, same question again
+            }
+        });
+
+        function loseLife() {
+            lives--; hud();
+            if (lives <= 0) {
+                running = false; ctx.clearRect(0, 0, W, H);
+                $("msg").textContent = "💥 Out of lives!";
+                $("go").textContent = "↻ Try Level " + (level + 1) + " Again"; $("go").style.display = "inline-flex";
+            }
+        }
+
+        /* ===== PART 7: LEVEL COMPLETE / PRIZE ===== */
+        function levelDone() {
+            running = false; ctx.clearRect(0, 0, W, H); hud();
+            const last = level === LEVELS.length - 1;
+            if (last) {
+                $("msg").textContent = "🏆 You win! Prize: " + PRIZES[Math.floor(Math.random() * PRIZES.length)];
+                $("go").textContent = "↻ Play Again";
+            } else {
+                $("msg").textContent = "🎉 Level " + (level + 1) + " complete!";
+                $("go").textContent = "Next Level ▶";
+            }
+            $("q").textContent = "";
+            $("go").style.display = "inline-flex";
+        }
+
+        // One button does everything: start, retry, next level, play again
+        $("go").onclick = () => {
+            if (running) return;
+            const finishedAll = $("go").textContent.includes("Play Again");
+            const retry = $("go").textContent.includes("Again") && !finishedAll;
+            const levelWon = $("go").textContent.includes("Next");
+            begin(finishedAll ? 0 : retry ? level : levelWon ? level + 1 : 0);
+        };
+
+        $("lvl").textContent = "Level 1 of " + LEVELS.length;
+        hud();
+    </script>
+</body>
+
+</html>
