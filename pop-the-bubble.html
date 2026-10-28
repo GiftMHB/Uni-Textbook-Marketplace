@@ -53,14 +53,14 @@
             background: var(--card);
             border: 1px solid var(--border);
             border-radius: 12px;
-            touch-action: none;
+            touch-action: pan-y;
         }
 
         #msg {
             font-size: 1.2rem;
             font-weight: 700;
             min-height: 32px;
-            margin: 12px 0 4px;
+            margin: 4px 0;
         }
     </style>
 </head>
@@ -73,19 +73,16 @@
 
         <div class="info"><span id="score"></span><span id="lives"></span></div>
         <div id="q">Tap START, then pop the bubble with the correct answer!</div>
-        <canvas id="c" width="360" height="460"></canvas>
         <div id="msg"></div>
         <button class="btn-primary" id="go">▶ START</button>
+        <canvas id="c" width="360" height="460" style="margin-top:12px"></canvas>
     </div>
 
     <script>
-        /* ===== PART 1: YOUR QUESTIONS (edit these) =====
-           q = question, o = three answers, a = position of the correct answer (0, 1 or 2).
-           Keep answers SHORT so they fit inside a bubble.
-           speed = how fast the bubbles float up in this level. */
+        
         const LEVELS = [
             {
-                speed: 1.1, questions: [       // ---- LEVEL 1: easy ----
+                speed: 1.1, questions: [     
                     { q: "Which email can a University of Pretoria student register with?", o: ["@tuks.co.za", "@gmail.com", "@outlook.com"], a: 0 },
                     { q: "What do you tap on a listing to save it to your wishlist?", o: ["Heart icon", "Star icon", "Bell icon"], a: 0 },
                     { q: "How many steps does it take to create a listing?", o: ["3", "4", "5"], a: 1 },
@@ -94,7 +91,7 @@
                 ]
             },
             {
-                speed: 1.6, questions: [       // ---- LEVEL 2: harder and faster ----
+                speed: 1.6, questions: [      
                     { q: "What happens when someone bids in the last moments of an auction?", o: ["Countdown extends", "Auction ends", "Bid is deleted"], a: 0 },
                     { q: "Who wins an auction if the reserve price was met?", o: ["Highest bidder", "First bidder", "The seller"], a: 0 },
                     { q: "What does the Bundle Optimizer try to reduce?", o: ["Meetups", "Photos", "Messages"], a: 0 },
@@ -104,11 +101,9 @@
             }
         ];
 
-        /* ===== PART 2: PRIZES (edit these) ===== */
-        const PRIZES = ["🍫 Chocolate", "🎁 Mystery prize"];
+        const PRIZES = ["Buiscuits 🍪"];
         const LIVES = 3;
 
-        /* ===== PART 3: GAME MEMORY ===== */
         const $ = id => document.getElementById(id);
         const cv = $("c"), ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
         const css = name => getComputedStyle(document.documentElement).getPropertyValue(name);
@@ -119,7 +114,6 @@
             $("lives").textContent = "❤️".repeat(Math.max(lives, 0));
         }
 
-        /* ===== PART 4: START A LEVEL ===== */
         function begin(i) {
             level = i;
             qs = [...LEVELS[i].questions].sort(() => Math.random() - 0.5);   // shuffle the questions
@@ -129,7 +123,6 @@
             spawn(); loop();
         }
 
-        // Put the current question's 3 answers at the bottom, in random lanes
         function spawn() {
             const Q = qs[qi];
             $("q").textContent = Q.q;
@@ -139,14 +132,13 @@
             hud();
         }
 
-        /* ===== PART 5: ANIMATION LOOP (runs ~60 times a second) ===== */
         function loop() {
             if (!running) return;
             ctx.clearRect(0, 0, W, H);
             ctx.textAlign = "center"; ctx.font = "bold 13px Montserrat, sans-serif";
             for (const b of bubbles) {
                 b.y -= b.v; b.wobble += 0.03;
-                b.dx = b.x + Math.sin(b.wobble) * 15;                  // gentle side-to-side
+                b.dx = b.x + Math.sin(b.wobble) * 15;                  
                 ctx.fillStyle = css("--card"); ctx.strokeStyle = css("--primary"); ctx.lineWidth = 4;
                 ctx.beginPath(); ctx.arc(b.dx, b.y, b.r, 0, 7); ctx.fill(); ctx.stroke();
                 ctx.fillStyle = css("--foreground");
@@ -158,7 +150,6 @@
             requestAnimationFrame(loop);
         }
 
-        // Split long answers over two lines so they fit in the bubble
         function wrap(text) {
             if (text.length <= 11 || !text.includes(" ")) return [text];
             const words = text.split(" "); let best = [text], gap = 99;
@@ -169,7 +160,6 @@
             return best;
         }
 
-        /* ===== PART 6: TAPPING A BUBBLE ===== */
         cv.addEventListener("pointerdown", e => {
             if (!running) return;
             const r = cv.getBoundingClientRect();
@@ -181,7 +171,7 @@
                 if (qi >= qs.length) return levelDone();
                 spawn();
             } else {
-                loseLife(); if (running) spawn();       // wrong tap: lose a life, same question again
+                loseLife(); if (running) spawn();      
             }
         });
 
@@ -194,7 +184,6 @@
             }
         }
 
-        /* ===== PART 7: LEVEL COMPLETE / PRIZE ===== */
         function levelDone() {
             running = false; ctx.clearRect(0, 0, W, H); hud();
             const last = level === LEVELS.length - 1;
@@ -209,7 +198,6 @@
             $("go").style.display = "inline-flex";
         }
 
-        // One button does everything: start, retry, next level, play again
         $("go").onclick = () => {
             if (running) return;
             const finishedAll = $("go").textContent.includes("Play Again");

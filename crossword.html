@@ -201,10 +201,11 @@
             ]
         ];
 
-        const PRIZES = ["🍫 Chocolate", "🎁 Mystery prize"];
+        const PRIZES = ["Buiscuits 🍪"];
 
+    
         const $ = id => document.getElementById(id);
-        const K = (r, c) => r + "," + c;              
+        const K = (r, c) => r + "," + c;                 
         let g, info, placed, answers, where, boxes, dir, level = 0, curCols = 1;
 
         function fits(w, r, c, d) {
@@ -220,7 +221,9 @@
             return crossings > 0;
         }
         function put(item, r, c, d) {
-            const word = { ...item, clue: item.c, r, c, d };   
+           
+            const word = { ...item, clue: item.c, r, c, d };
+            placed.push(word);   
             for (let i = 0; i < item.w.length; i++) {
                 const k = K(r + d * i, c + (1 - d) * i);
                 g.set(k, item.w[i]);
@@ -228,17 +231,17 @@
             }
         }
         function fitGrid() {                            
-            const room = $("grid").parentElement.clientWidth;          
+            const room = $("grid").parentElement.clientWidth;           
             const size = Math.max(18, Math.min(34, Math.floor((room - 2 * (curCols - 1)) / curCols)));
             document.documentElement.style.setProperty("--cell", size + "px");
         }
         window.addEventListener("resize", fitGrid);      
 
-        function showClue(k) {                         
+        function showClue(k) {                          
             const p = where.get(k)[dir];
             $("now").textContent = p.n + " " + (p.d ? "Down" : "Across") + ": " + p.clue + " (" + p.w.length + ")";
         }
-        function move(r, c, step) {                     
+        function move(r, c, step) {                      
             const next = dir ? K(r + step, c) : K(r, c + step);
             if (boxes.has(next)) boxes.get(next).focus();
         }
@@ -326,7 +329,7 @@
         };
         $("next").onclick = () => load(level + 1 < LEVELS.length ? level + 1 : 0);
 
-        load(0);   
+        load(0);   // start on Level 1
     </script>
 </body>
 
